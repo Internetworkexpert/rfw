@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 #
-# Copyrite (c) 2014 SecurityKISS Ltd (http://www.securitykiss.com)  
+# Copyrite (c) 2014 SecurityKISS Ltd (http://www.securitykiss.com)
 #
 # This file is part of rfw
 #
 # The MIT License (MIT)
 #
-# Yes, Mr patent attorney, you have nothing to do here. Find a decent job instead. 
+# Yes, Mr patent attorney, you have nothing to do here. Find a decent job instead.
 # Fight intellectual "property".
 #
 # Permission is hereby granted, free of charge, to any person obtaining
@@ -39,22 +39,22 @@ else:
     sys.exit(1)
 
 
-import argparse, logging, re, sys, struct, socket, subprocess, signal, time, json, os
+import argparse, logging, re, sys, subprocess, signal, time, json, os
 from Queue import Queue, PriorityQueue
-from threading import Thread
 import config, rfwconfig, cmdparse, iputil, rfwthreads, iptables
 from sslserver import SSLServer, PlainServer, BasicAuthRequestHandler, CommonRequestHandler
 from iptables import Iptables
 
-   
+
 log = logging.getLogger('rfw')
+
 
 def perr(msg):
     print(msg, file=sys.stderr)
 
 
 def create_requesthandlers(rfwconf, cmd_queue, expiry_queue):
-    """Create RequestHandler type. This is a way to avoid global variables: a closure returning a class type that binds rfwconf and cmd_queue inside. 
+    """Create RequestHandler type. This is a way to avoid global variables: a closure returning a class type that binds rfwconf and cmd_queue inside.
     """
 
     ver = '0.0.0'
@@ -72,19 +72,17 @@ def create_requesthandlers(rfwconf, cmd_queue, expiry_queue):
         log.error('Could not read {}: {} {}'.format(version_file, e.strerror, e.filename))
     server_ver = 'SecurityKISS rfw/{}'.format(ver)
 
-
     def check_whitelist_conflict(ip, whitelist):
         if ip != '0.0.0.0/0' and iputil.ip_in_list(ip, whitelist):
             msg = 'Ignoring the request conflicting with the whitelist'
             log.warn(msg)
             raise Exception(msg)
 
-
     def process(handler, modify, urlpath):
         # modify should be 'D' for Delete or 'I' for Insert understood as -D and -I iptables flags
         assert modify in ['D', 'I', 'L']
         log.debug('process {} urlpath: {}'.format(modify, urlpath))
-      
+
         try:
             action, rule, directives = cmdparse.parse_command(urlpath)
             log.debug('\nAction: {}\nRule: {}\nDirectives: {}'.format(action, rule, directives))
@@ -95,8 +93,8 @@ def create_requesthandlers(rfwconf, cmd_queue, expiry_queue):
                 elif action == 'list':
                     chain = rule
                     rules = Iptables.read_simple_rules(chain)
-                    log.debug('List rfw rules: %s', rules) 
-                    list_of_dict = map(iptables.Rule._asdict, rules)                    
+                    log.debug('List rfw rules: %s', rules)
+                    list_of_dict = map(iptables.Rule._asdict, rules)
                     resp = json.dumps(list_of_dict)
                     return handler.http_resp(200, resp)
                 elif rfwconf.is_non_restful():
@@ -124,15 +122,13 @@ def create_requesthandlers(rfwconf, cmd_queue, expiry_queue):
                 raise Exception('Unrecognized command.')
         except Exception, e:
             msg = 'ERROR: {}'.format(e.message)
-            # logging as error disabled - bad client request is not an error 
+            # logging as error disabled - bad client request is not an error
             # log.exception(msg)
             log.info(msg)
             return handler.http_resp(400, msg) # Bad Request
-            
-
 
     class LocalRequestHandler(CommonRequestHandler):
-        
+
         def version_string(self):
             return server_ver
 
@@ -144,17 +140,15 @@ def create_requesthandlers(rfwconf, cmd_queue, expiry_queue):
 
         def do_PUT(self):
             self.go('I', self.path, self.client_address[0])
-    
+
         def do_DELETE(self):
             self.go('D', self.path, self.client_address[0])
-    
+
         def do_GET(self):
             self.go('L', self.path, self.client_address[0])
-    
-   
 
     class OutwardRequestHandler(BasicAuthRequestHandler):
-        
+
         def version_string(self):
             return server_ver
 
@@ -165,24 +159,20 @@ def create_requesthandlers(rfwconf, cmd_queue, expiry_queue):
             # authenticate by checking if client IP is in the whitelist - normally reqests from non-whitelisted IPs should be blocked by firewall beforehand
             if not iputil.ip_in_list(remote_addr, rfwconf.whitelist()):
                 log.error('Request from client IP: {} which is not authorized in the whitelist. It should have been blocked by firewall.'.format(remote_addr))
-                return self.http_resp(403, '') # Forbidden 
+                return self.http_resp(403, '') # Forbidden
 
             process(self, modify, urlpath)
 
         def do_PUT(self):
             self.go('I', self.path, self.client_address[0])
-    
+
         def do_DELETE(self):
             self.go('D', self.path, self.client_address[0])
-    
+
         def do_GET(self):
             self.go('L', self.path, self.client_address[0])
-    
-   
+
     return LocalRequestHandler, OutwardRequestHandler
-
-
-
 
 
 def create_args_parser():
@@ -196,6 +186,7 @@ def create_args_parser():
     parser.add_argument('--logfile', default=LOG_FILE, help='Log file (default {})'.format(LOG_FILE))
     parser.add_argument('-v', help='Verbose console output. Sets DEBUG log level for stderr logger (default ERROR)', action='store_true')
     return parser
+
 
 def parse_args():
     parser = create_args_parser()
@@ -220,6 +211,7 @@ def __sigTERMhandler(signum, frame):
     log.debug("Caught signal {}. Exiting".format(signum))
     perr('')
     stop()
+
 
 def stop():
     logging.shutdown()
@@ -262,7 +254,7 @@ def rfw_init_rules(rfwconf):
         try:
             Iptables.exe(['-D', 'INPUT', '-p', 'tcp', '--dport', rfw_port, '-s', ip, '-j', 'ACCEPT'])
             Iptables.exe(['-D', 'OUTPUT', '-p', 'tcp', '--sport', rfw_port, '-d', ip, '-j', 'ACCEPT'])
-        except subprocess.CalledProcessError, e:
+        except subprocess.CalledProcessError:
             pass  # ignore
         Iptables.exe(['-I', 'INPUT', '-p', 'tcp', '--dport', rfw_port, '-s', ip, '-j', 'ACCEPT'])
         Iptables.exe(['-I', 'OUTPUT', '-p', 'tcp', '--sport', rfw_port, '-d', ip, '-j', 'ACCEPT'])
@@ -279,7 +271,7 @@ def main():
 
     if args.v:
         log.info('Console logging in verbose mode')
-    
+
     log.info("Logging to file: {}".format(args.logfile))
     log.info("File log level: {}".format(args.loglevel))
 
@@ -290,7 +282,7 @@ def main():
         create_args_parser().print_usage()
         sys.exit(1)
 
-    # Initialize Iptables with configured path to system iptables 
+    # Initialize Iptables with configured path to system iptables
     Iptables.ipt_path = rfwconf.iptables_path()
     startup_sanity_check()
 
@@ -298,8 +290,6 @@ def main():
     signal.signal(signal.SIGTERM, __sigTERMhandler)
     signal.signal(signal.SIGINT, __sigTERMhandler)
     # TODO we may also need to ignore signal.SIGHUP in daemon mode
-    
-
 
     rules = Iptables.load().rules
     # TODO make logging more efficient by deferring arguments evaluation
@@ -316,35 +306,34 @@ def main():
     expiry_queue = PriorityQueue()
     cmd_queue = Queue()
 
-    rfwthreads.CommandProcessor(cmd_queue, 
+    rfwthreads.CommandProcessor(cmd_queue,
                             rfwconf.whitelist(),
                             expiry_queue,
                             rfwconf.default_expire()).start()
 
     rfwthreads.ExpiryManager(cmd_queue, expiry_queue).start()
 
-    # Passing HandlerClass to SSLServer is very limiting, seems like a bad design of BaseServer. 
+    # Passing HandlerClass to SSLServer is very limiting, seems like a bad design of BaseServer.
     # In order to pass extra info to RequestHandler without using global variable we have to wrap the class in closure.
     LocalHandlerClass, OutwardHandlerClass = create_requesthandlers(rfwconf, cmd_queue, expiry_queue)
     if rfwconf.is_outward_server():
         server_address = (rfwconf.outward_server_ip(), int(rfwconf.outward_server_port()))
         httpd = SSLServer(
-                    server_address, 
-                    OutwardHandlerClass, 
-                    rfwconf.outward_server_certfile(), 
-                    rfwconf.outward_server_keyfile())
+            server_address,
+            OutwardHandlerClass,
+            rfwconf.outward_server_certfile(),
+            rfwconf.outward_server_keyfile())
         rfwthreads.ServerRunner(httpd).start()
 
     if rfwconf.is_local_server():
         server_address = ('127.0.0.1', int(rfwconf.local_server_port()))
         httpd = PlainServer(
-                    server_address, 
-                    LocalHandlerClass)
+            server_address,
+            LocalHandlerClass)
         rfwthreads.ServerRunner(httpd).start()
 
     # wait forever
     time.sleep(1e9)
-
 
 
 if __name__ == "__main__":
