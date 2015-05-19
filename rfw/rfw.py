@@ -227,6 +227,10 @@ def rfw_init_rules(rfwconf):
         Rule(chain='OUTPUT', num='1', pkts='0', bytes='0', target='ACCEPT', prot='tcp', opt='--', inp='*', out='*', source='0.0.0.0/0', destination='127.0.0.1', extra='tcp spt:7393')
         Rule(chain='OUTPUT', num='4', pkts='0', bytes='0', target='DROP', prot='tcp', opt='--', inp='*', out='*', source='0.0.0.0/0', destination='0.0.0.0/0', extra='tcp spt:7393')
     """
+    if not rfwconf.is_outward_server():
+        log.info("We are not an outward server; skipping rfw_init_rules")
+        return
+
     rfw_port = rfwconf.outward_server_port()
     ipt = Iptables.load()
 
