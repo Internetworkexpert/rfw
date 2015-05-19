@@ -119,6 +119,18 @@ class RfwConfig(config.Config):
     def is_local_server(self):
         return self._getflag("local.server", "local.server not enabled. Ignoring local.server.port if present.")
 
+    def local_server_ip(self):
+        if self.is_local_server():
+            try:
+                ip = self._get("local.server.ip")
+                if ip and iputil.validate_ip(ip):
+                    return ip
+                else:
+                    raise self.config_error("Wrong local.server.ip value. It should be ... uh ... whatever iputil.validate_ip says")
+            except NoOptionError, e:
+                raise self.config_error(str(e))
+        else:
+            raise self.config_error("local.server.ip read while local.server not enabled")
 
     def local_server_port(self):
         if self.is_local_server():
