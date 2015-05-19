@@ -90,9 +90,9 @@ class RfwConfig(config.Config):
             else:
                 raise self.config_error("Wrong outward.server.port value. It should be a single number from the 1..65535 range")
         else:
-            self.config_error("outward.server.port read while outward.server not enabled")
-    
-    
+            raise self.config_error("outward.server.port read while outward.server not enabled")
+
+
     def outward_server_ip(self):
         if self.is_outward_server():
             try:
